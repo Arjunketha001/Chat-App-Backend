@@ -1,13 +1,16 @@
 import { StatusCodes } from 'http-status-codes';
 import { v4 as uuidv4 } from 'uuid';
 
+// import { addEmailtoMailQueue } from '../producer'
+import { addEmailToQueue } from '../producer/mailQueueProducer.js';
 import channelRepository from '../repositories/channelRepostiory.js';
 import userRepository from '../repositories/userRepository.js';
 import workspaceRepository from '../repositories/workspaceRepository.js';
+import { workspaceJoinMail } from '../utils/common/mailObject.js';
 import ClientError from '../utils/errors/clientError.js';
 import ValidationError from '../utils/errors/validationError.js';
 
-const isUserAdminOfWorkspace = (workspace, userId) => {
+export const isUserAdminOfWorkspace = (workspace, userId) => {
   console.log(workspace.members, userId);
   const response = workspace.members.find(
     (member) =>
@@ -19,13 +22,13 @@ const isUserAdminOfWorkspace = (workspace, userId) => {
   return response;
 };
 
-const isUserMemberOfWorkspace = (workspace, userId) => {
+export const isUserMemberOfWorkspace = (workspace, userId) => {
   return workspace.members.find(
     (member) => member.memberId.toString() === userId
   );
 };
 
-const isChannelAlreadyPartOfWorkspace = (workspace, channelName) => {
+export const isChannelAlreadyPartOfWorkspace = (workspace, channelName) => {
   return workspace.channels.find(
     (channel) => channel.name.toLowerCase() === channelName.toLowerCase()
   );
@@ -204,12 +207,7 @@ export const updateWorkspaceService = async (
 };
 
 // first check if the user is an admin of the workspace, then add any member to the workspace
-export const addMemberToWorkspaceService = async (
-  workspaceId,
-  memberId,
-  role,
-  userId
-) => {
+export const addMemberToWorkspaceService = async ( workspaceId, memberId,role,userId) => {
   try {
     const workspace = await workspaceRepository.getById(workspaceId);
     if (!workspace) {
@@ -227,7 +225,7 @@ export const addMemberToWorkspaceService = async (
         message: 'User is not an admin of the workspace',
         statusCode: StatusCodes.UNAUTHORIZED
       });
-    }
+    };
 
     const isValidUser = await userRepository.getById(memberId);
     if (!isValidUser) {
@@ -236,7 +234,7 @@ export const addMemberToWorkspaceService = async (
         message: 'User not found',
         statusCode: StatusCodes.NOT_FOUND
       });
-    }
+    };
     const isMember = isUserMemberOfWorkspace(workspace, memberId);
     if (isMember) {
       throw new ClientError({
@@ -245,11 +243,26 @@ export const addMemberToWorkspaceService = async (
         statusCode: StatusCodes.UNAUTHORIZED
       });
     }
+
+    
+
     const response = await workspaceRepository.addMemberToWorkspace(
       workspaceId,
       memberId,
       role
     );
+
+    // addEmailToQueue({...mailObject, 
+    //   to:isValidUser.email
+    //   });
+
+    //workspaceJoinMail returns from , subject , text ... u have to destructure
+    // write the function to pass name of the member and workspace name to the mailObject
+
+    addEmailToQueue({...workspaceJoinMail(workspace,isValidUser.username),to:isValidUser.email});
+
+
+
     return response;
   } catch (error) {
     console.log('addMemberToWorkspaceService error', error);
