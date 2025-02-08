@@ -26,3 +26,9 @@ export const getMessageService=async(messageParams,page,limit,user )=>{
     const messages=await messageRepository.getPaginatedMessages(messageParams,page,limit);
     return messages;
 }
+
+
+export const createMessageService=async(message)=>{
+    const messageDetails=await messageRepository.create(message);
+    return messageDetails;
+}

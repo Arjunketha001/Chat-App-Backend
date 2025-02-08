@@ -1,4 +1,4 @@
-import Message from '../schema/channel.js';
+import Message from '../schema/message.js';
 import crudRepository from './crudRepository.js';
 
 
