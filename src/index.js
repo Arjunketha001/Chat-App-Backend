@@ -8,6 +8,7 @@ import bullServerAdapter from './config/bullboardConfig.js';
 import connectDB from './config/dbConfig.js';
 // import mailer from './config/mailConfig.js';
 import { PORT } from './config/serverConfig.js';
+import channelSocketHandlers from './controllers/channelSocketController.js';
 import messageSocketController from './controllers/messageSocketCntroller.js';
 import apiRouter from './routes/apiRoutes.js';
 
@@ -46,6 +47,9 @@ io.on('connection', (socket) => {
 
 
   messageSocketController(io, socket); // io is server instance and socket is client instance
+  channelSocketHandlers(io, socket);
+
+  
 });
 // listens both express and socket.io server
 
