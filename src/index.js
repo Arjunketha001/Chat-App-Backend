@@ -11,12 +11,13 @@ import connectDB from './config/dbConfig.js';
 import { PORT } from './config/serverConfig.js';
 import channelSocketHandlers from './controllers/channelSocketController.js';
 import messageSocketController from './controllers/messageSocketCntroller.js';
+import { verifyEmailController } from './controllers/workspaceController.js';
 import apiRouter from './routes/apiRoutes.js';
 
 const app = express();
 
 const server=createServer(app);
-const io=new Server(server)
+const io=new Server(server , { cors: { origin: '*' } });
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -25,6 +26,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 
 app.use('/ui', bullServerAdapter.getRouter());
+app.get('/verify/:token', verifyEmailController);
 
 
 
@@ -48,7 +50,8 @@ io.on('connection', (socket) => {
   //   socket.broadcast.emit('message', data.toUpperCase());
   //   });
 
-
+  console.log('user socket connected', socket.id);
+  
   messageSocketController(io, socket); // io is server instance and socket is client instance
   channelSocketHandlers(io, socket);
 

@@ -1,8 +1,7 @@
 import { StatusCodes } from 'http-status-codes';
 import { v4 as uuidv4 } from 'uuid';
 
-// import { addEmailtoMailQueue } from '../producer'
-import { addEmailToQueue } from '../producer/mailQueueProducer.js';
+import { addEmailtoMailQueue } from '../producers/mailQueueProducer.js';
 import channelRepository from '../repositories/channelRepostiory.js';
 import userRepository from '../repositories/userRepository.js';
 import workspaceRepository from '../repositories/workspaceRepository.js';
@@ -10,7 +9,7 @@ import { workspaceJoinMail } from '../utils/common/mailObject.js';
 import ClientError from '../utils/errors/clientError.js';
 import ValidationError from '../utils/errors/validationError.js';
 
-export const isUserAdminOfWorkspace = (workspace, userId) => {
+const isUserAdminOfWorkspace = (workspace, userId) => {
   console.log(workspace.members, userId);
   const response = workspace.members.find(
     (member) =>
@@ -18,19 +17,17 @@ export const isUserAdminOfWorkspace = (workspace, userId) => {
         member.memberId._id.toString() === userId) &&
       member.role === 'admin'
   );
-  console.log(response);
   return response;
 };
 
 export const isUserMemberOfWorkspace = (workspace, userId) => {
-  console.log(userId);
   return workspace.members.find((member) => {
     console.log('member id ', member.memberId.toString());
     return member.memberId._id.toString() === userId;
   });
 };
 
-export const isChannelAlreadyPartOfWorkspace = (workspace, channelName) => {
+const isChannelAlreadyPartOfWorkspace = (workspace, channelName) => {
   return workspace.channels.find(
     (channel) => channel.name.toLowerCase() === channelName.toLowerCase()
   );
@@ -122,10 +119,10 @@ export const deleteWorkspaceService = async (workspaceId, userId) => {
   }
 };
 
-
 export const getWorkspaceService = async (workspaceId, userId) => {
   try {
-    const workspace = await workspaceRepository.getWorkspaceDetailsById(workspaceId);
+    const workspace =
+      await workspaceRepository.getWorkspaceDetailsById(workspaceId);
     if (!workspace) {
       throw new ClientError({
         explanation: 'Invalid data sent from the client',
@@ -133,6 +130,7 @@ export const getWorkspaceService = async (workspaceId, userId) => {
         statusCode: StatusCodes.NOT_FOUND
       });
     }
+    console.log(workspace);
     const isMember = isUserMemberOfWorkspace(workspace, userId);
     if (!isMember) {
       throw new ClientError({
@@ -208,8 +206,29 @@ export const updateWorkspaceService = async (
   }
 };
 
-// first check if the user is an admin of the workspace, then add any member to the workspace
-export const addMemberToWorkspaceService = async ( workspaceId, memberId,role,userId) => {
+export const resetWorkspaceJoinCodeService = async (workspaceId, userId) => {
+  try {
+    const newJoinCode = uuidv4().substring(0, 6).toUpperCase();
+    const updatedWorkspace = await updateWorkspaceService(
+      workspaceId,
+      {
+        joinCode: newJoinCode
+      },
+      userId
+    );
+    return updatedWorkspace;
+  } catch (error) {
+    console.log('resetWorkspaceJoinCodeService error', error);
+    throw error;
+  }
+};
+
+export const addMemberToWorkspaceService = async (
+  workspaceId,
+  memberId,
+  role,
+  userId
+) => {
   try {
     const workspace = await workspaceRepository.getById(workspaceId);
     if (!workspace) {
@@ -227,7 +246,7 @@ export const addMemberToWorkspaceService = async ( workspaceId, memberId,role,us
         message: 'User is not an admin of the workspace',
         statusCode: StatusCodes.UNAUTHORIZED
       });
-    };
+    }
 
     const isValidUser = await userRepository.getById(memberId);
     if (!isValidUser) {
@@ -236,7 +255,7 @@ export const addMemberToWorkspaceService = async ( workspaceId, memberId,role,us
         message: 'User not found',
         statusCode: StatusCodes.NOT_FOUND
       });
-    };
+    }
     const isMember = isUserMemberOfWorkspace(workspace, memberId);
     if (isMember) {
       throw new ClientError({
@@ -245,26 +264,15 @@ export const addMemberToWorkspaceService = async ( workspaceId, memberId,role,us
         statusCode: StatusCodes.UNAUTHORIZED
       });
     }
-
-    
-
     const response = await workspaceRepository.addMemberToWorkspace(
       workspaceId,
       memberId,
       role
     );
-
-    // addEmailToQueue({...mailObject, 
-    //   to:isValidUser.email
-    //   });
-
-    //workspaceJoinMail returns from , subject , text ... u have to destructure
-    // write the function to pass name of the member and workspace name to the mailObject
-
-    addEmailToQueue({...workspaceJoinMail(workspace,isValidUser.username),to:isValidUser.email});
-
-
-
+    addEmailtoMailQueue({
+      ...workspaceJoinMail(workspace),
+      to: isValidUser.email
+    });
     return response;
   } catch (error) {
     console.log('addMemberToWorkspaceService error', error);
@@ -320,20 +328,35 @@ export const addChannelToWorkspaceService = async (
   }
 };
 
-
-export const resetWorkspaceJoinCodeService = async (workspaceId, userId) => {
+export const joinWorkspaceService = async (workspaceId, joinCode, userId) => {
   try {
-    const newJoinCode = uuidv4().substring(0, 6).toUpperCase();
-    const updatedWorkspace = await updateWorkspaceService(
+    const workspace =
+      await workspaceRepository.getWorkspaceDetailsById(workspaceId);
+    if (!workspace) {
+      throw new ClientError({
+        explanation: 'Invalid data sent from the client',
+        message: 'Workspace not found',
+        statusCode: StatusCodes.NOT_FOUND
+      });
+    }
+
+    if (workspace.joinCode !== joinCode) {
+      throw new ClientError({
+        explanation: 'Invalid data sent from the client',
+        message: 'Invalid join code',
+        statusCode: StatusCodes.UNAUTHORIZED
+      });
+    }
+
+    const updatedWorkspace = await workspaceRepository.addMemberToWorkspace(
       workspaceId,
-      {
-        joinCode: newJoinCode
-      },
-      userId
+      userId,
+      'member'
     );
+
     return updatedWorkspace;
   } catch (error) {
-    console.log('resetWorkspaceJoinCodeService error', error);
+    console.log('joinWorkspaceService error', error);
     throw error;
   }
 };
