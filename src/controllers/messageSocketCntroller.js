@@ -11,6 +11,8 @@ export default function messageHandlers(io, socket) {
     const {channelId}=data;
     const messageResponse = await createMessageService(data);
     // socket.broadcast.emit(NEW_MESSAGE_RECEIVED_EVENT, messageResponse);
+    console.log('Channel', channelId);
+
     io.to(channelId).emit(NEW_MESSAGE_RECEIVED_EVENT, messageResponse); // only members of that channel will get the message
     cb({
       success: true,
